@@ -1,6 +1,8 @@
 node_modules/
+frontend/node_modules/
+node-v*/ 
 *.log
-dist/
-build/
-.next/
 .env
+
+node-v18.18.0-linux-x64/
+frontend/node_modules/
