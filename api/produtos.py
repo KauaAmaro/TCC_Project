@@ -5,16 +5,6 @@ from sqlalchemy import create_engine, Column, Integer, String, DateTime
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 
-# Database setup
-DATABASE_URL = os.getenv("DATABASE_URL")
-if not DATABASE_URL:
-    raise ValueError("DATABASE_URL não configurada")
-
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-
-engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 class Produto(Base):
@@ -24,7 +14,18 @@ class Produto(Base):
     descricao = Column(String, nullable=False)
     data_cadastro = Column(DateTime, default=datetime.utcnow)
 
-Base.metadata.create_all(bind=engine)
+def get_db():
+    DATABASE_URL = os.getenv("DATABASE_URL")
+    if not DATABASE_URL:
+        raise ValueError("DATABASE_URL não configurada no Vercel")
+    
+    if DATABASE_URL.startswith("postgres://"):
+        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+    
+    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+    Base.metadata.create_all(bind=engine)
+    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+    return SessionLocal()
 
 def handler(request):
     headers = {
@@ -38,7 +39,7 @@ def handler(request):
         return {'statusCode': 200, 'headers': headers, 'body': ''}
     
     try:
-        db = SessionLocal()
+        db = get_db()
         
         if request.method == 'POST':
             data = json.loads(request.body)
