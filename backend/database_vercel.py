@@ -4,16 +4,23 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 
-# Use PostgreSQL for production (Vercel) or SQLite for local development
-DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./leituras.db")
+# PostgreSQL only - no SQLite fallback
+DATABASE_URL = os.getenv("DATABASE_URL")
 
-# Fix for PostgreSQL URL format in some environments
+if not DATABASE_URL:
+    raise ValueError(
+        "DATABASE_URL não configurada. Configure PostgreSQL do Supabase:\n"
+        "DATABASE_URL=postgresql://postgres:PASSWORD@HOST:5432/postgres"
+    )
+
+# Fix for PostgreSQL URL format
 if DATABASE_URL.startswith("postgres://"):
     DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False} if "sqlite" in DATABASE_URL else {}
+    pool_pre_ping=True,
+    pool_recycle=300
 )
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)

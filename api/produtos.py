@@ -22,6 +22,7 @@ class handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         try:
+            
             content_length = int(self.headers['Content-Length'])
             post_data = self.rfile.read(content_length)
             data = json.loads(post_data.decode('utf-8'))
@@ -36,6 +37,7 @@ class handler(BaseHTTPRequestHandler):
                 self.send_header('Access-Control-Allow-Origin', '*')
                 self.end_headers()
                 self.wfile.write(json.dumps({"detail": "Código de barras já cadastrado"}).encode())
+                db.close()
                 return
             
             # Create new product
