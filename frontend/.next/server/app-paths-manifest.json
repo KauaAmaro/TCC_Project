@@ -1,0 +1,5 @@
+{
+  "/cadastro/page": "app/cadastro/page.js",
+  "/page": "app/page.js",
+  "/relatorio/page": "app/relatorio/page.js"
+}
