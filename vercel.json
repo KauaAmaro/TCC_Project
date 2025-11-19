@@ -6,14 +6,22 @@
       "use": "@vercel/next"
     },
     {
-      "src": "backend/api/main.py",
+      "src": "api/*.py",
       "use": "@vercel/python"
     }
   ],
   "routes": [
     {
-      "src": "/api/(.*)",
-      "dest": "backend/api/main.py"
+      "src": "/api/produtos",
+      "dest": "api/produtos.py"
+    },
+    {
+      "src": "/api/leituras",
+      "dest": "api/leituras.py"
+    },
+    {
+      "src": "/api/relatorio",
+      "dest": "api/relatorio.py"
     },
     {
       "src": "/(.*)",

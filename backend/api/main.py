@@ -10,9 +10,17 @@ import os
 # Add backend directory to path
 sys.path.append(os.path.join(os.path.dirname(__file__), '..'))
 
-from database_vercel import get_db, Leitura, Produto
+try:
+    from database_vercel import get_db, Leitura, Produto
+except ImportError:
+    # Fallback for local development
+    from database import get_db, Leitura, Produto
 
 app = FastAPI(title="Barcode Reader API")
+
+# Handler for Vercel
+def handler(request, context):
+    return app(request, context)
 
 app.add_middleware(
     CORSMiddleware,

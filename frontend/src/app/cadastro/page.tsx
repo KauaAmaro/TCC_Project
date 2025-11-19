@@ -32,6 +32,9 @@ export default function Cadastro() {
     setMessage('')
 
     try {
+      console.log('API_BASE:', API_BASE)
+      console.log('Enviando dados:', { codigo_barras: codigoBarras.trim(), descricao: descricao.trim() })
+      
       const response = await fetch(`${API_BASE}/produtos`, {
         method: 'POST',
         headers: {
@@ -43,21 +46,25 @@ export default function Cadastro() {
         })
       })
 
+      console.log('Response status:', response.status)
+      
       if (response.ok) {
         setMessage('Produto cadastrado com sucesso!')
         setMessageType('success')
         setCodigoBarras('')
         setDescricao('')
-
       } else if (response.status === 409) {
         setMessage('Código de barras já cadastrado')
         setMessageType('error')
       } else {
-        setMessage('Erro ao cadastrar produto')
+        const errorText = await response.text()
+        console.error('Error details:', errorText)
+        setMessage(`Erro ${response.status}: ${errorText || 'Erro desconhecido'}`)
         setMessageType('error')
       }
-    } catch (error) {
-      setMessage('Erro de conexão com o servidor')
+    } catch (error: any) {
+      console.error('Fetch error:', error)
+      setMessage(`Erro de conexão: ${error.message}`)
       setMessageType('error')
     } finally {
       setLoading(false)
