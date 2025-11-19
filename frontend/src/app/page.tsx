@@ -16,7 +16,7 @@ export default function Home() {
   const [isStreaming, setIsStreaming] = useState(false)
   const [loading, setLoading] = useState(false)
 
-  const API_BASE = 'http://localhost:8000'
+  const API_BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000'
 
   useEffect(() => {
     const interval = setInterval(fetchLeituras, 2000)

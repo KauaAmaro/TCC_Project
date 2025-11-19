@@ -1,0 +1,13 @@
+{
+  "name": "barcode-reader-fullstack",
+  "version": "1.0.0",
+  "description": "Sistema de leitura de códigos de barras",
+  "scripts": {
+    "dev": "cd frontend && npm run dev",
+    "build": "cd frontend && npm run build",
+    "start": "cd frontend && npm start"
+  },
+  "keywords": ["barcode", "reader", "nextjs", "fastapi"],
+  "author": "",
+  "license": "MIT"
+}

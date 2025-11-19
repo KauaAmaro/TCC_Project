@@ -1,40 +1,23 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import Link from 'next/link'
 
-interface Produto {
-  id: number
-  codigo_barras: string
-  descricao: string
-  data_cadastro: string
-}
+
 
 export default function Cadastro() {
   const [codigoBarras, setCodigoBarras] = useState('')
   const [descricao, setDescricao] = useState('')
-  const [produtos, setProdutos] = useState<Produto[]>([])
+
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
   const [messageType, setMessageType] = useState<'success' | 'error'>('success')
 
-  const API_BASE = 'http://localhost:8000'
+  const API_BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000'
 
-  useEffect(() => {
-    fetchProdutos()
-  }, [])
 
-  const fetchProdutos = async () => {
-    try {
-      const response = await fetch(`${API_BASE}/produtos`)
-      if (response.ok) {
-        const data = await response.json()
-        setProdutos(data)
-      }
-    } catch (error) {
-      console.error('Erro ao carregar produtos:', error)
-    }
-  }
+
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -65,7 +48,7 @@ export default function Cadastro() {
         setMessageType('success')
         setCodigoBarras('')
         setDescricao('')
-        fetchProdutos() // Atualizar lista
+
       } else if (response.status === 409) {
         setMessage('Código de barras já cadastrado')
         setMessageType('error')
@@ -81,9 +64,7 @@ export default function Cadastro() {
     }
   }
 
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-BR')
-  }
+
 
   return (
     <div className="container">
@@ -149,37 +130,7 @@ export default function Cadastro() {
         )}
       </div>
 
-      <div className="card">
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
-          <h2>Produtos Cadastrados ({produtos.length})</h2>
-          <button className="btn btn-primary" onClick={fetchProdutos}>
-            Atualizar
-          </button>
-        </div>
 
-        {produtos.length === 0 ? (
-          <p>Nenhum produto cadastrado ainda.</p>
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>Código de Barras</th>
-                <th>Descrição</th>
-                <th>Data Cadastro</th>
-              </tr>
-            </thead>
-            <tbody>
-              {produtos.map((produto) => (
-                <tr key={produto.id}>
-                  <td>{produto.codigo_barras}</td>
-                  <td>{produto.descricao}</td>
-                  <td>{formatDate(produto.data_cadastro)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
-      </div>
     </div>
   )
 }

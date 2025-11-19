@@ -14,7 +14,7 @@ export default function Relatorio() {
   const [error, setError] = useState('')
   const [debugInfo, setDebugInfo] = useState('')
 
-  const API_BASE = 'http://localhost:8000'
+  const API_BASE = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8000'
 
   useEffect(() => {
     console.log('🔄 Componente Relatório montado, iniciando fetch...')
