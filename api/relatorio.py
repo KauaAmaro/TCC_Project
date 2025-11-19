@@ -1,53 +1,64 @@
-from http.server import BaseHTTPRequestHandler
 import json
 import os
-import sys
+from datetime import datetime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime, func
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-# Add backend to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+# Database setup
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL não configurada")
 
-try:
-    from database_vercel import SessionLocal, Leitura
-    from sqlalchemy import func
-except ImportError as e:
-    print(f"Import error: {e}")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-    def do_GET(self):
-        try:
-            db = SessionLocal()
-            
-            result = db.query(
-                Leitura.descricao,
-                func.sum(Leitura.quantidade).label('total_quantidade')
-            ).group_by(Leitura.descricao).order_by(func.sum(Leitura.quantidade).desc()).all()
-            
-            response = [
-                {
-                    "descricao": r.descricao,
-                    "quantidade": r.total_quantidade
-                }
-                for r in result
-            ]
-            
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(response).encode())
-            
+class Leitura(Base):
+    __tablename__ = "leituras"
+    id = Column(Integer, primary_key=True, index=True)
+    codigo_barras = Column(String, index=True)
+    descricao = Column(String, default="Não identificado")
+    quantidade = Column(Integer, default=1)
+    data_hora = Column(DateTime, default=datetime.utcnow)
+
+Base.metadata.create_all(bind=engine)
+
+def handler(request):
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'application/json'
+    }
+    
+    if request.method == 'OPTIONS':
+        return {'statusCode': 200, 'headers': headers, 'body': ''}
+    
+    try:
+        db = SessionLocal()
+        
+        result = db.query(
+            Leitura.descricao,
+            func.sum(Leitura.quantidade).label('total_quantidade')
+        ).group_by(Leitura.descricao).order_by(func.sum(Leitura.quantidade).desc()).all()
+        
+        response = [{
+            "descricao": r.descricao,
+            "quantidade": r.total_quantidade
+        } for r in result]
+        
+        return {'statusCode': 200, 'headers': headers, 'body': json.dumps(response)}
+        
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': headers,
+            'body': json.dumps({"error": str(e)})
+        }
+    finally:
+        if 'db' in locals():
             db.close()
-            
-        except Exception as e:
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())

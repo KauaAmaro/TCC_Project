@@ -1,102 +1,90 @@
-from http.server import BaseHTTPRequestHandler
 import json
 import os
-import sys
+from datetime import datetime
+from sqlalchemy import create_engine, Column, Integer, String, DateTime
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker
 
-# Add backend to path
-sys.path.append(os.path.join(os.path.dirname(__file__), '..', 'backend'))
+# Database setup
+DATABASE_URL = os.getenv("DATABASE_URL")
+if not DATABASE_URL:
+    raise ValueError("DATABASE_URL não configurada")
 
-try:
-    from database_vercel import SessionLocal, Produto
-    from datetime import datetime
-except ImportError as e:
-    print(f"Import error: {e}")
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
 
-class handler(BaseHTTPRequestHandler):
-    def do_OPTIONS(self):
-        self.send_response(200)
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
+engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+Base = declarative_base()
 
-    def do_POST(self):
-        try:
+class Produto(Base):
+    __tablename__ = "produtos"
+    id = Column(Integer, primary_key=True, index=True)
+    codigo_barras = Column(String, unique=True, index=True, nullable=False)
+    descricao = Column(String, nullable=False)
+    data_cadastro = Column(DateTime, default=datetime.utcnow)
+
+Base.metadata.create_all(bind=engine)
+
+def handler(request):
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'application/json'
+    }
+    
+    if request.method == 'OPTIONS':
+        return {'statusCode': 200, 'headers': headers, 'body': ''}
+    
+    try:
+        db = SessionLocal()
+        
+        if request.method == 'POST':
+            data = json.loads(request.body)
             
-            content_length = int(self.headers['Content-Length'])
-            post_data = self.rfile.read(content_length)
-            data = json.loads(post_data.decode('utf-8'))
-            
-            db = SessionLocal()
-            
-            # Check if exists
             existing = db.query(Produto).filter(Produto.codigo_barras == data['codigo_barras']).first()
             if existing:
-                self.send_response(409)
-                self.send_header('Content-Type', 'application/json')
-                self.send_header('Access-Control-Allow-Origin', '*')
-                self.end_headers()
-                self.wfile.write(json.dumps({"detail": "Código de barras já cadastrado"}).encode())
-                db.close()
-                return
+                return {
+                    'statusCode': 409,
+                    'headers': headers,
+                    'body': json.dumps({"detail": "Código de barras já cadastrado"})
+                }
             
-            # Create new product
-            db_produto = Produto(
+            produto = Produto(
                 codigo_barras=data['codigo_barras'].strip(),
                 descricao=data['descricao'].strip()
             )
-            db.add(db_produto)
+            db.add(produto)
             db.commit()
-            db.refresh(db_produto)
+            db.refresh(produto)
             
             response = {
-                "id": db_produto.id,
-                "codigo_barras": db_produto.codigo_barras,
-                "descricao": db_produto.descricao,
-                "data_cadastro": db_produto.data_cadastro.isoformat()
+                "id": produto.id,
+                "codigo_barras": produto.codigo_barras,
+                "descricao": produto.descricao,
+                "data_cadastro": produto.data_cadastro.isoformat()
             }
             
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(response).encode())
-            
-            db.close()
-            
-        except Exception as e:
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
-
-    def do_GET(self):
-        try:
-            db = SessionLocal()
+            return {'statusCode': 200, 'headers': headers, 'body': json.dumps(response)}
+        
+        elif request.method == 'GET':
             produtos = db.query(Produto).order_by(Produto.data_cadastro.desc()).all()
+            response = [{
+                "id": p.id,
+                "codigo_barras": p.codigo_barras,
+                "descricao": p.descricao,
+                "data_cadastro": p.data_cadastro.isoformat()
+            } for p in produtos]
             
-            response = [
-                {
-                    "id": p.id,
-                    "codigo_barras": p.codigo_barras,
-                    "descricao": p.descricao,
-                    "data_cadastro": p.data_cadastro.isoformat()
-                }
-                for p in produtos
-            ]
+            return {'statusCode': 200, 'headers': headers, 'body': json.dumps(response)}
             
-            self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps(response).encode())
-            
+    except Exception as e:
+        return {
+            'statusCode': 500,
+            'headers': headers,
+            'body': json.dumps({"error": str(e)})
+        }
+    finally:
+        if 'db' in locals():
             db.close()
-            
-        except Exception as e:
-            self.send_response(500)
-            self.send_header('Content-Type', 'application/json')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.end_headers()
-            self.wfile.write(json.dumps({"error": str(e)}).encode())
