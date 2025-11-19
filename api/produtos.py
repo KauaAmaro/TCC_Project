@@ -1,31 +1,48 @@
 import json
 import os
 from datetime import datetime
-from sqlalchemy import create_engine, Column, Integer, String, DateTime
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 
-Base = declarative_base()
-
-class Produto(Base):
-    __tablename__ = "produtos"
-    id = Column(Integer, primary_key=True, index=True)
-    codigo_barras = Column(String, unique=True, index=True, nullable=False)
-    descricao = Column(String, nullable=False)
-    data_cadastro = Column(DateTime, default=datetime.utcnow)
-
-def get_db():
+def handler(request):
+    headers = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type',
+        'Content-Type': 'application/json'
+    }
+    
+    if request.method == 'OPTIONS':
+        return {'statusCode': 200, 'headers': headers, 'body': ''}
+    
+    # Check DATABASE_URL
     DATABASE_URL = os.getenv("DATABASE_URL")
     if not DATABASE_URL:
-        raise ValueError("DATABASE_URL não configurada no Vercel")
+        return {
+            'statusCode': 500,
+            'headers': headers,
+            'body': json.dumps({"error": "DATABASE_URL não configurada no Vercel"})
+        }
     
-    if DATABASE_URL.startswith("postgres://"):
-        DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
-    
-    engine = create_engine(DATABASE_URL, pool_pre_ping=True)
-    Base.metadata.create_all(bind=engine)
-    SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    return SessionLocal()
+    try:
+        from sqlalchemy import create_engine, Column, Integer, String, DateTime
+        from sqlalchemy.ext.declarative import declarative_base
+        from sqlalchemy.orm import sessionmaker
+        
+        if DATABASE_URL.startswith("postgres://"):
+            DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+        
+        engine = create_engine(DATABASE_URL, pool_pre_ping=True)
+        Base = declarative_base()
+        
+        class Produto(Base):
+            __tablename__ = "produtos"
+            id = Column(Integer, primary_key=True, index=True)
+            codigo_barras = Column(String, unique=True, index=True, nullable=False)
+            descricao = Column(String, nullable=False)
+            data_cadastro = Column(DateTime, default=datetime.utcnow)
+        
+        Base.metadata.create_all(bind=engine)
+        SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+        db = SessionLocal()
 
 def handler(request):
     headers = {
@@ -46,6 +63,7 @@ def handler(request):
             
             existing = db.query(Produto).filter(Produto.codigo_barras == data['codigo_barras']).first()
             if existing:
+                db.close()
                 return {
                     'statusCode': 409,
                     'headers': headers,
@@ -67,6 +85,7 @@ def handler(request):
                 "data_cadastro": produto.data_cadastro.isoformat()
             }
             
+            db.close()
             return {'statusCode': 200, 'headers': headers, 'body': json.dumps(response)}
         
         elif request.method == 'GET':
@@ -78,14 +97,14 @@ def handler(request):
                 "data_cadastro": p.data_cadastro.isoformat()
             } for p in produtos]
             
+            db.close()
             return {'statusCode': 200, 'headers': headers, 'body': json.dumps(response)}
             
     except Exception as e:
+        if 'db' in locals():
+            db.close()
         return {
             'statusCode': 500,
             'headers': headers,
             'body': json.dumps({"error": str(e)})
         }
-    finally:
-        if 'db' in locals():
-            db.close()
